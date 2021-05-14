@@ -1,7 +1,7 @@
 'use strict';
 
 const assert = require('assert');
-const mongoose = require('mongoose');
+const mongoose = require('mongoose'); mongoose.Promise = global.Promise;
 const merge = require('merge');
 require('dotenv').config({ silent: true });
 
@@ -51,13 +51,11 @@ Storage.prototype._connect = function() {
   var self = this;
 
   var defaultOpts = {
-    mongos: false,
     ssl: false,
-    server: {
-      auto_reconnect: true,
-      reconnectTries: Number.MAX_VALUE,
-      reconnectInterval: 5000
-    }
+    auto_reconnect: true,
+    useNewUrlParser: true,
+    useCreateIndex: true,
+    useUnifiedTopology: true
   };
 
   var opts = merge.recursive(true, defaultOpts, this._options);
@@ -66,16 +64,26 @@ Storage.prototype._connect = function() {
 
   this.connection = mongoose.createConnection(this._uri, opts);
 
-  this.connection.on('error', function(err) {
-    self._log.error('database connection error:', err.message);
-  });
+  if (this.connection.then) {
+    // handle promise rejections rather than using event emmiters
+    this.connection.then(() => {
+      self._log.info('connected to database');
+    }).catch(err => {
+      self._log.error('database connection error: ', err);
+    });
+  } else {
+    // For unit tests
+    this.connection.on('connected', () => {
+      self._log.info('connected to database');
+    });
 
+    this.connection.on('error', err => {
+      self._log.error('database connection error: ', err);
+    });
+  }
+  
   this.connection.on('disconnected', function() {
     self._log.warn('disconnected from database');
-  });
-
-  this.connection.on('connected', function() {
-    self._log.info('connected to database');
   });
 
   this.models = this._createBoundModels();

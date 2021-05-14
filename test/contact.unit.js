@@ -4,7 +4,7 @@ const sinon = require('sinon');
 const async = require('async');
 const expect = require('chai').expect;
 const errors = require('storj-service-error-types');
-const mongoose = require('mongoose');
+const mongoose = require('mongoose'); mongoose.Promise = global.Promise;
 const storj = require('storj-lib');
 
 /*jshint maxstatements: 100 */
@@ -16,19 +16,25 @@ const ContactSchema = require('../lib/models/contact');
 var Contact;
 var connection;
 
-before(function(done) {
+before(done => {
   connection = mongoose.createConnection(
     'mongodb://127.0.0.1:27017/__storj-bridge-test',
+    {
+      useNewUrlParser: true,
+      useCreateIndex: true,
+      useUnifiedTopology: true,
+      useFindAndModify: false
+    },
     function() {
       Contact = ContactSchema(connection);
-      Contact.remove({}, function() {
+      Contact.deleteMany({}, function() {
         done();
       });
     }
   );
 });
 
-after(function(done) {
+after(done => {
   connection.close(done);
 });
 
@@ -36,7 +42,7 @@ describe('Storage/models/Contact', function() {
 
   describe('#record', function() {
 
-    it('should record the unique contacts by their nodeID', function(done) {
+    it('should record the unique contacts by their nodeID', done => {
       var nodes = [
         storj.KeyPair().getNodeID(),
         storj.KeyPair().getNodeID(),
@@ -55,7 +61,7 @@ describe('Storage/models/Contact', function() {
         if (err) {
           return done(err);
         }
-        Contact.count({}, function(err, count) {
+        Contact.countDocuments({}, function(err, count) {
           expect(count).to.equal(3);
 
           Contact.findOne({_id: nodes[0]}, (err, contact) => {
@@ -70,7 +76,7 @@ describe('Storage/models/Contact', function() {
       });
     });
 
-    it('should not record with empty address', function(done) {
+    it('should not record with empty address', done => {
       Contact.record({
         port: 1337,
         nodeID: storj.KeyPair().getNodeID(),
@@ -84,7 +90,7 @@ describe('Storage/models/Contact', function() {
       });
     });
 
-    it('should record with a responseTime', function(done) {
+    it('should record with a responseTime', done => {
       const nodeID = storj.KeyPair().getNodeID();
       Contact.record({
         address: '127.0.0.1',
@@ -107,7 +113,7 @@ describe('Storage/models/Contact', function() {
       });
     });
 
-    it('it should not give validation error', function(done) {
+    it('it should not give validation error', done => {
       const data = {
         nodeID: '082305b1b4119cf393a8ad392e45cb2b8abd8e43',
         protocol: '0.7.0',
@@ -128,7 +134,7 @@ describe('Storage/models/Contact', function() {
       });
     });
 
-    it('can be called twice', function(done) {
+    it('can be called twice', done => {
       const data = {
         nodeID: 'bd0ce272eb2dd2e2927b7b0956ecbce32ff65d38',
         protocol: '0.7.0',
@@ -152,7 +158,7 @@ describe('Storage/models/Contact', function() {
   });
 
   describe('#recordPoints', function() {
-    const sandbox = sinon.sandbox.create();
+    const sandbox = sinon.createSandbox();
     afterEach(() => sandbox.restore());
 
     it('it should not go above maximum', function() {
@@ -190,15 +196,14 @@ describe('Storage/models/Contact', function() {
   });
 
   describe('#recordTimeoutFailure', function() {
-    const sandbox = sinon.sandbox.create();
+    const sandbox = sinon.createSandbox();
     afterEach(() => sandbox.restore());
 
     it('will set last timeout', function() {
       const contact = new Contact({});
       contact.recordTimeoutFailure();
-
-      expect(contact.lastTimeout).to.be.above(Date.now() - 5000);
-      expect(contact.lastTimeout).to.be.below(Date.now() + 5000);
+      expect(contact.lastTimeout).to.be.above(new Date(Date.now() - 5000));
+      expect(contact.lastTimeout).to.be.below(new Date(Date.now() + 5000));
 
     });
 
@@ -326,21 +331,21 @@ describe('Storage/models/Contact', function() {
       const contact = new Contact({});
       expect(function() {
         contact.recordResponseTime(NaN);
-      }).to.throw('Assertion');
+      }).to.throw('responseTime is expected to be a finite number');
     });
 
     it('will throw if number is not finite (Infinity)', function() {
       const contact = new Contact({});
       expect(function() {
         contact.recordResponseTime(Infinity);
-      }).to.throw('Assertion');
+      }).to.throw('responseTime is expected to be a finite number');
     });
 
     it('will throw if number is not finite (string)', function() {
       const contact = new Contact({});
       expect(function() {
         contact.recordResponseTime('2000');
-      }).to.throw('Assertion');
+      }).to.throw('responseTime is expected to be a finite number');
     });
 
     it('will start using 10s with 1000 reqs as period', function() {
@@ -389,10 +394,10 @@ describe('Storage/models/Contact', function() {
   });
 
   describe('#updateLastContractSent', function() {
-    const sandbox = sinon.sandbox.create();
+    const sandbox = sinon.createSandbox();
     afterEach(() => sandbox.restore());
 
-    it('will update the last contract sent time', function(done) {
+    it('will update the last contract sent time', done => {
       let clock = sandbox.useFakeTimers();
       let nodeID = storj.KeyPair().getNodeID();
       let now = Date.now();
@@ -433,7 +438,7 @@ describe('Storage/models/Contact', function() {
 
   describe('#recall', function() {
 
-    it('should recall the last N seen contacts', function(done) {
+    it('should recall the last N seen contacts', done => {
       Contact.recall(2, function(err, contacts) {
         expect(err).to.equal(null);
         expect(contacts).to.have.lengthOf(2);
@@ -445,7 +450,7 @@ describe('Storage/models/Contact', function() {
 
   describe('#toObject', function() {
 
-    it('should contain specified properties + virtuals', function(done) {
+    it('should contain specified properties + virtuals', done => {
       const contact = new Contact({
         _id: storj.KeyPair().getNodeID(),
         address: '127.0.0.1',
