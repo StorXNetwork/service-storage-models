@@ -35,7 +35,7 @@ before(function(done) {
   );
 });
 
-after(function(done) {
+after((done) => {
   connection.close(done);
 });
 
